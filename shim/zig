@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Lightweight zig shim — resolves version from .zvm file or global default,
+# then exec's the real zig binary. No shell startup cost.
+set -euo pipefail
+
+ZVM_DIR="${ZVM_HOME:-$HOME/.zvm}"
+
+# walk up from cwd looking for .zvm
+dir="$PWD"
+while true; do
+  if [[ -f "$dir/.zvm" ]]; then
+    version="$(< "$dir/.zvm")"
+    break
+  fi
+  [[ "$dir" != "/" ]] || break
+  dir="${dir%/*}"
+  [[ -n "$dir" ]] || dir="/"
+done
+
+# fall back to global default
+if [[ -z "${version:-}" && -f "$ZVM_DIR/default" ]]; then
+  version="$(< "$ZVM_DIR/default")"
+fi
+
+if [[ -z "${version:-}" ]]; then
+  echo "zvm: no zig version set (use 'zvm use <version>' or create a .zvm file)" >&2
+  exit 1
+fi
+
+zig="$ZVM_DIR/versions/$version/zig"
+if [[ ! -x "$zig" ]]; then
+  echo "zvm: zig $version is not installed (run: zvm install $version)" >&2
+  exit 1
+fi
+
+exec "$zig" "$@"

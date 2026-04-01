@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ZVM_DIR="${ZVM_HOME:-$HOME/.zvm}"
+VERSIONS_DIR="$ZVM_DIR/versions"
+BIN_DIR="$ZVM_DIR/bin"
+DEFAULT_FILE="$ZVM_DIR/default"
+INDEX_URL="https://ziglang.org/download/index.json"
+
+# --- helpers ---
+
+die() { echo "zvm: $*" >&2; exit 1; }
+
+detect_platform() {
+  local arch os
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64)  arch="x86_64" ;;
+    aarch64|arm64) arch="aarch64" ;;
+    *) die "unsupported architecture: $arch" ;;
+  esac
+
+  os="$(uname -s)"
+  case "$os" in
+    Linux)  os="linux" ;;
+    Darwin) os="macos" ;;
+    *) die "unsupported OS: $os" ;;
+  esac
+
+  echo "${arch}-${os}"
+}
+
+fetch_index() {
+  if command -v curl &>/dev/null; then
+    curl -sfL "$INDEX_URL"
+  elif command -v wget &>/dev/null; then
+    wget -qO- "$INDEX_URL"
+  else
+    die "curl or wget required"
+  fi
+}
+
+ensure_dirs() {
+  mkdir -p "$VERSIONS_DIR" "$BIN_DIR"
+}
+
+installed_versions() {
+  if [[ -d "$VERSIONS_DIR" ]]; then
+    ls "$VERSIONS_DIR" 2>/dev/null
+  fi
+}
+
+get_default() {
+  if [[ -f "$DEFAULT_FILE" ]]; then
+    cat "$DEFAULT_FILE"
+  fi
+}
+
+# --- commands ---
+
+cmd_install() {
+  local version="${1:?usage: zvm install <version>}"
+  local platform tarball_url shasum dest tmpdir
+
+  # resolve "nightly" to the "master" key in the index
+  local index_key="$version"
+  [[ "$version" != "nightly" ]] || index_key="master"
+
+  if [[ "$version" != "nightly" && -d "$VERSIONS_DIR/$version" ]]; then
+    echo "zig $version is already installed"
+    return
+  fi
+
+  ensure_dirs
+  platform="$(detect_platform)"
+
+  echo "fetching version index..."
+  local index
+  index="$(fetch_index)" || die "failed to fetch version index"
+
+  tarball_url="$(echo "$index" | jq -r --arg v "$index_key" --arg p "$platform" '.[$v][$p].tarball // empty')"
+  shasum="$(echo "$index" | jq -r --arg v "$index_key" --arg p "$platform" '.[$v][$p].shasum // empty')"
+
+  [[ -n "$tarball_url" ]] || die "version '$version' not found for platform '$platform'"
+
+  tmpdir="$(mktemp -d)"
+  trap 'rm -rf '"\"$tmpdir\""'' EXIT
+
+  echo "downloading zig $version..."
+  if command -v curl &>/dev/null; then
+    curl -#fL "$tarball_url" -o "$tmpdir/zig.tar.xz"
+  else
+    wget -q --show-progress "$tarball_url" -O "$tmpdir/zig.tar.xz"
+  fi
+
+  if [[ -n "$shasum" ]]; then
+    echo "verifying checksum..."
+    local actual
+    actual="$(shasum -a 256 "$tmpdir/zig.tar.xz" | awk '{print $1}')"
+    [[ "$actual" == "$shasum" ]] || die "checksum mismatch: expected $shasum, got $actual"
+  fi
+
+  echo "extracting..."
+  dest="$VERSIONS_DIR/$version"
+  rm -rf "$dest"
+  mkdir -p "$dest"
+  tar -xJf "$tmpdir/zig.tar.xz" -C "$dest" --strip-components=1
+
+  echo "installed zig $version"
+
+  # set as default if it's the first install
+  if [[ -z "$(get_default)" ]]; then
+    cmd_use "$version"
+  fi
+}
+
+cmd_use() {
+  local version="${1:?usage: zvm use <version>}"
+  [[ -d "$VERSIONS_DIR/$version" ]] || die "version '$version' is not installed (run: zvm install $version)"
+  echo "$version" > "$DEFAULT_FILE"
+  echo "default zig set to $version"
+}
+
+cmd_list() {
+  local default_version
+  default_version="$(get_default)"
+  local versions
+  versions="$(installed_versions)"
+
+  if [[ -z "$versions" ]]; then
+    echo "no versions installed"
+    return
+  fi
+
+  while IFS= read -r v; do
+    if [[ "$v" == "$default_version" ]]; then
+      echo "* $v"
+    else
+      echo "  $v"
+    fi
+  done <<< "$versions"
+}
+
+cmd_list_remote() {
+  echo "fetching available versions..."
+  local index
+  index="$(fetch_index)" || die "failed to fetch version index"
+  echo "$index" | jq -r 'keys[]' | sed 's/^master$/nightly/' | sort -V
+}
+
+cmd_init() {
+  local version="${1:-}"
+  if [[ -z "$version" ]]; then
+    version="$(get_default)"
+    [[ -n "$version" ]] || die "no version specified and no default set"
+  fi
+  echo "$version" > .zvm
+  echo "pinned zig $version in .zvm"
+}
+
+cmd_which() {
+  local version
+  version="$(_resolve_version)"
+  echo "$VERSIONS_DIR/$version/zig"
+}
+
+cmd_help() {
+  cat <<'EOF'
+usage: zvm <command> [args]
+
+commands:
+  install <version>   download and install a zig version
+  use <version>       set the global default version
+  list                show installed versions
+  list-remote         show all available versions
+  init [version]      create a .zvm file in the current directory
+  which               print path to the active zig binary
+  help                show this help
+
+per-project version:
+  create a .zvm file containing a version string (e.g. "0.15.2")
+  or run "zvm init" to pin the current default
+
+setup:
+  add ~/.zvm/bin to your PATH:
+    export PATH="$HOME/.zvm/bin:$PATH"
+EOF
+}
+
+# --- version resolution (used by shim) ---
+
+_resolve_version() {
+  # walk up from cwd looking for .zvm
+  local dir="$PWD"
+  while true; do
+    if [[ -f "$dir/.zvm" ]]; then
+      cat "$dir/.zvm"
+      return
+    fi
+    [[ "$dir" != "/" ]] || break
+    dir="$(dirname "$dir")"
+  done
+
+  # fall back to global default
+  local default_version
+  default_version="$(get_default)"
+  if [[ -n "$default_version" ]]; then
+    echo "$default_version"
+    return
+  fi
+
+  die "no zig version set (use 'zvm use <version>' or create a .zvm file)"
+}
+
+# --- main ---
+
+case "${1:-help}" in
+  install)     shift; cmd_install "$@" ;;
+  use)         shift; cmd_use "$@" ;;
+  list)        cmd_list ;;
+  list-remote) cmd_list_remote ;;
+  init)        shift; cmd_init "$@" ;;
+  which)       cmd_which ;;
+  help|--help|-h) cmd_help ;;
+  *) die "unknown command: $1 (run 'zvm help')" ;;
+esac
