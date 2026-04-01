@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ZVM_DIR="${ZVM_HOME:-$HOME/.zvm}"
-VERSIONS_DIR="$ZVM_DIR/versions"
-BIN_DIR="$ZVM_DIR/bin"
-DEFAULT_FILE="$ZVM_DIR/default"
+ZIPPY_DIR="${ZIPPY_HOME:-$HOME/.zippy}"
+VERSIONS_DIR="$ZIPPY_DIR/versions"
+BIN_DIR="$ZIPPY_DIR/bin"
+DEFAULT_FILE="$ZIPPY_DIR/default"
 INDEX_URL="https://ziglang.org/download/index.json"
 
 # --- helpers ---
 
-die() { echo "zvm: $*" >&2; exit 1; }
+die() { echo "zippy: $*" >&2; exit 1; }
 
 detect_platform() {
   local arch os
@@ -59,7 +59,7 @@ get_default() {
 # --- commands ---
 
 cmd_install() {
-  local version="${1:?usage: zvm install <version>}"
+  local version="${1:?usage: zippy install <version>}"
   local platform tarball_url shasum dest tmpdir
 
   # resolve "nightly" to the "master" key in the index
@@ -115,8 +115,8 @@ cmd_install() {
 }
 
 cmd_use() {
-  local version="${1:?usage: zvm use <version>}"
-  [[ -d "$VERSIONS_DIR/$version" ]] || die "version '$version' is not installed (run: zvm install $version)"
+  local version="${1:?usage: zippy use <version>}"
+  [[ -d "$VERSIONS_DIR/$version" ]] || die "version '$version' is not installed (run: zippy install $version)"
   echo "$version" > "$DEFAULT_FILE"
   echo "default zig set to $version"
 }
@@ -154,8 +154,8 @@ cmd_init() {
     version="$(get_default)"
     [[ -n "$version" ]] || die "no version specified and no default set"
   fi
-  echo "$version" > .zvm
-  echo "pinned zig $version in .zvm"
+  echo "$version" > .zippy
+  echo "pinned zig $version in .zippy"
 }
 
 cmd_which() {
@@ -166,35 +166,35 @@ cmd_which() {
 
 cmd_help() {
   cat <<'EOF'
-usage: zvm <command> [args]
+usage: zippy <command> [args]
 
 commands:
   install <version>   download and install a zig version
   use <version>       set the global default version
   list                show installed versions
   list-remote         show all available versions
-  init [version]      create a .zvm file in the current directory
+  init [version]      create a .zippy file in the current directory
   which               print path to the active zig binary
   help                show this help
 
 per-project version:
-  create a .zvm file containing a version string (e.g. "0.15.2")
-  or run "zvm init" to pin the current default
+  create a .zippy file containing a version string (e.g. "0.15.2")
+  or run "zippy init" to pin the current default
 
 setup:
-  add ~/.zvm/bin to your PATH:
-    export PATH="$HOME/.zvm/bin:$PATH"
+  add ~/.zippy/bin to your PATH:
+    export PATH="$HOME/.zippy/bin:$PATH"
 EOF
 }
 
 # --- version resolution (used by shim) ---
 
 _resolve_version() {
-  # walk up from cwd looking for .zvm
+  # walk up from cwd looking for .zippy
   local dir="$PWD"
   while true; do
-    if [[ -f "$dir/.zvm" ]]; then
-      cat "$dir/.zvm"
+    if [[ -f "$dir/.zippy" ]]; then
+      cat "$dir/.zippy"
       return
     fi
     [[ "$dir" != "/" ]] || break
@@ -209,7 +209,7 @@ _resolve_version() {
     return
   fi
 
-  die "no zig version set (use 'zvm use <version>' or create a .zvm file)"
+  die "no zig version set (use 'zippy use <version>' or create a .zippy file)"
 }
 
 # --- main ---
@@ -222,5 +222,5 @@ case "${1:-help}" in
   init)        shift; cmd_init "$@" ;;
   which)       cmd_which ;;
   help|--help|-h) cmd_help ;;
-  *) die "unknown command: $1 (run 'zvm help')" ;;
+  *) die "unknown command: $1 (run 'zippy help')" ;;
 esac

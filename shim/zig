@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Lightweight zig shim — resolves version from .zvm file or global default,
+# Lightweight zig shim — resolves version from .zippy file or global default,
 # then exec's the real zig binary. No shell startup cost.
 set -euo pipefail
 
-ZVM_DIR="${ZVM_HOME:-$HOME/.zvm}"
+ZIPPY_DIR="${ZIPPY_HOME:-$HOME/.zippy}"
 
-# walk up from cwd looking for .zvm
+# walk up from cwd looking for .zippy
 dir="$PWD"
 while true; do
-  if [[ -f "$dir/.zvm" ]]; then
-    version="$(< "$dir/.zvm")"
+  if [[ -f "$dir/.zippy" ]]; then
+    version="$(< "$dir/.zippy")"
     break
   fi
   [[ "$dir" != "/" ]] || break
@@ -18,18 +18,18 @@ while true; do
 done
 
 # fall back to global default
-if [[ -z "${version:-}" && -f "$ZVM_DIR/default" ]]; then
-  version="$(< "$ZVM_DIR/default")"
+if [[ -z "${version:-}" && -f "$ZIPPY_DIR/default" ]]; then
+  version="$(< "$ZIPPY_DIR/default")"
 fi
 
 if [[ -z "${version:-}" ]]; then
-  echo "zvm: no zig version set (use 'zvm use <version>' or create a .zvm file)" >&2
+  echo "zippy: no zig version set (use 'zippy use <version>' or create a .zippy file)" >&2
   exit 1
 fi
 
-zig="$ZVM_DIR/versions/$version/zig"
+zig="$ZIPPY_DIR/versions/$version/zig"
 if [[ ! -x "$zig" ]]; then
-  echo "zvm: zig $version is not installed (run: zvm install $version)" >&2
+  echo "zippy: zig $version is not installed (run: zippy install $version)" >&2
   exit 1
 fi
 

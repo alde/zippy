@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ZVM_DIR="${ZVM_HOME:-$HOME/.zvm}"
-REPO="https://raw.githubusercontent.com/alde/zvm/master"
+ZIPPY_DIR="${ZIPPY_HOME:-$HOME/.zippy}"
+REPO="https://raw.githubusercontent.com/alde/zippy/master"
 
-echo "installing zvm..."
+echo "installing zippy..."
 
-mkdir -p "$ZVM_DIR/bin" "$ZVM_DIR/versions"
+mkdir -p "$ZIPPY_DIR/bin" "$ZIPPY_DIR/versions"
 
-# download zvm and shim
-curl -sfL "$REPO/zvm" -o "$ZVM_DIR/zvm"
-curl -sfL "$REPO/shim/zig" -o "$ZVM_DIR/bin/zig"
-chmod +x "$ZVM_DIR/zvm" "$ZVM_DIR/bin/zig"
+# download zippy and shim
+curl -sfL "$REPO/zippy" -o "$ZIPPY_DIR/zippy"
+curl -sfL "$REPO/shim/zig" -o "$ZIPPY_DIR/bin/zig"
+chmod +x "$ZIPPY_DIR/zippy" "$ZIPPY_DIR/bin/zig"
 
-# symlink zvm into bin
-ln -sf "$ZVM_DIR/zvm" "$ZVM_DIR/bin/zvm"
+# symlink zippy into bin
+ln -sf "$ZIPPY_DIR/zippy" "$ZIPPY_DIR/bin/zippy"
 
 # detect shell and configure PATH
-add_to_path='export PATH="$HOME/.zvm/bin:$PATH"'
+add_to_path='export PATH="$HOME/.zippy/bin:$PATH"'
 
 shell_name="$(basename "$SHELL")"
 case "$shell_name" in
@@ -33,19 +33,19 @@ case "$shell_name" in
     echo "add this to your shell config:"
     echo "  $add_to_path"
     echo ""
-    echo "done! restart your shell, then run: zvm help"
+    echo "done! restart your shell, then run: zippy help"
     exit 0
     ;;
 esac
 
-if ! grep -qF '.zvm/bin' "$rc" 2>/dev/null; then
+if ! grep -qF '.zippy/bin' "$rc" 2>/dev/null; then
   echo "" >> "$rc"
-  echo "# zvm" >> "$rc"
+  echo "# zippy" >> "$rc"
   echo "$add_to_path" >> "$rc"
-  echo "added zvm to PATH in $rc"
+  echo "added zippy to PATH in $rc"
 else
   echo "PATH already configured in $rc"
 fi
 
 echo ""
-echo "done! restart your shell, then run: zvm help"
+echo "done! restart your shell, then run: zippy help"

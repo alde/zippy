@@ -1,32 +1,32 @@
 #!/usr/bin/env fish
 
-set ZVM_DIR (set -q ZVM_HOME; and echo $ZVM_HOME; or echo $HOME/.zvm)
-set REPO "https://raw.githubusercontent.com/alde/zvm/master"
+set ZIPPY_DIR (set -q ZIPPY_HOME; and echo $ZIPPY_HOME; or echo $HOME/.zippy)
+set REPO "https://raw.githubusercontent.com/alde/zippy/master"
 
-echo "installing zvm..."
+echo "installing zippy..."
 
-mkdir -p $ZVM_DIR/bin $ZVM_DIR/versions
+mkdir -p $ZIPPY_DIR/bin $ZIPPY_DIR/versions
 
-# download zvm and shim
-curl -sfL $REPO/zvm -o $ZVM_DIR/zvm
-curl -sfL $REPO/shim/zig -o $ZVM_DIR/bin/zig
-chmod +x $ZVM_DIR/zvm $ZVM_DIR/bin/zig
+# download zippy and shim
+curl -sfL $REPO/zippy -o $ZIPPY_DIR/zippy
+curl -sfL $REPO/shim/zig -o $ZIPPY_DIR/bin/zig
+chmod +x $ZIPPY_DIR/zippy $ZIPPY_DIR/bin/zig
 
-# symlink zvm into bin
-ln -sf $ZVM_DIR/zvm $ZVM_DIR/bin/zvm
+# symlink zippy into bin
+ln -sf $ZIPPY_DIR/zippy $ZIPPY_DIR/bin/zippy
 
 # configure PATH in fish
 set -l fish_conf_dir $HOME/.config/fish
-set -l conf $fish_conf_dir/conf.d/zvm.fish
+set -l conf $fish_conf_dir/conf.d/zippy.fish
 
 if not test -f $conf
     mkdir -p $fish_conf_dir/conf.d
-    echo '# zvm' > $conf
-    echo 'fish_add_path $HOME/.zvm/bin' >> $conf
-    echo "added zvm to PATH in $conf"
+    echo '# zippy' > $conf
+    echo 'fish_add_path $HOME/.zippy/bin' >> $conf
+    echo "added zippy to PATH in $conf"
 else
     echo "PATH already configured in $conf"
 end
 
 echo ""
-echo "done! restart your shell, then run: zvm help"
+echo "done! restart your shell, then run: zippy help"
